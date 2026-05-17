@@ -8,14 +8,22 @@ app = Flask(__name__)
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"}
 
-# ── Scrape homepage to get NIFTY & BANKNIFTY spot prices ──────────────────────
+# ── Fetch spot price from a known option page for that index ──────────────────
+def fetch_spot(symbol, known_strike, opt_type="CE"):
+    url = f"https://munafasutra.com/nse/optionsChart/{symbol}/{opt_type}/{known_strike}"
+    try:
+        r = requests.get(url, headers=HEADERS, timeout=10)
+        m = re.search(rf'Spot price of {symbol}:\s*([\d,]+\.?\d*)', r.text)
+        if m:
+            return float(m.group(1).replace(",", ""))
+    except Exception:
+        pass
+    return None
+
 def get_spot_prices():
-    r = requests.get("https://munafasutra.com/", headers=HEADERS, timeout=10)
-    text = r.text
-    nifty_m      = re.search(r'NIFTY[:\s]+([\d,]+\.?\d*)', text)
-    banknifty_m  = re.search(r'BANKNIFTY[:\s]+([\d,]+\.?\d*)', text)
-    nifty_spot   = float(nifty_m.group(1).replace(",",""))   if nifty_m   else 23650
-    bn_spot      = float(banknifty_m.group(1).replace(",","")) if banknifty_m else 53700
+    # Use a rough known strike just to get the spot — actual strikes built from spot after
+    nifty_spot = fetch_spot("NIFTY",     23500, "CE") or 23650
+    bn_spot    = fetch_spot("BANKNIFTY", 55900, "CE") or 53700
     return nifty_spot, bn_spot
 
 # ── Build ATM strikes around spot (step=50 for NIFTY, 100 for BN) ─────────────
